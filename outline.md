@@ -1,4 +1,5 @@
 # Wildfire Tracking & Prediction
+_AI-assisted development roadmap/plan using Gemini 2.5 Pro_
 
 >#### **Prerequisites**
 >This project assumes basic familiarity with Python, familiarity with predictive modeling, and a GitHub account for version control and automation, and an account with a cloud provider like Google Cloud Platform (GCP) or Amazon Web Services (AWS) for storage. If one or more of these prerequisites is not met, additional required learning (or creation of accounts) will increase time-to-completion but not render the project unapproachable. 
