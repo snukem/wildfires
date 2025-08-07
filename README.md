@@ -30,10 +30,10 @@ The project aims to follow an end-to-end data science lifecycle starting with in
 *   **Data Processing:** Python, Polars, GeoPandas, Rasterio
 *   **Machine Learning:** Scikit-learn, XGBoost, SHAP, LightGBM, PyTorch
 *   **Visualization & Application:** Streamlit, Plotly, marimo
+* **Version Control:** git, GitHub
    
 ## Skills
 *   **Data Engineering:** Building automated, serverless data pipelines (CI/CD); cloud data management and organization (Data Lake principles); ingesting and processing diverse data formats (API, vector, raster).
 *   **Geospatial Analysis:** Fusing heterogeneous geospatial datasets; performing spatial joins and raster sampling; creating and working with standardized geographic grids.
 *   **Machine Learning:** Advanced classification technique, potentially many for comparison; solving the critical problem of highly imbalanced data; implementing state-of-the-art model interpretability for Explainable AI (XAI).
 *   **Application Development:** Building and deploying a full-stack, interactive data application from scratch using a modern Python framework.
-
