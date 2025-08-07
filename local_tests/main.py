@@ -95,8 +95,9 @@ def _():
 @app.cell
 def _(gpd):
     # Load the shapefile with GeoPolars
-    shp_path = "../data/ca_geo/CA_State.shp"
-    ca_gdf=gpd.read_file("https://www.naturalearthdata.com/downloads/110m-cultural-vectors/")
+    shp_path = "../data/ne_10m/ne_10m_land.shp"
+    ca_gdf = gpd.read_file(shp_path)
+    ca_gdf.head()
 
     # ensure the CRS is what we expect (WGS84 for lat/lon)
     # * CRS: Coordinate Reference System
@@ -107,11 +108,11 @@ def _(gpd):
 
 
 @app.cell
-def _(ca_gdf):
+def _():
     # Get the polygon representing California's boundary
-    ca_boundary = ca_gdf.union_all()
-    ca_boundary
-    return (ca_boundary,)
+    # ca_boundary = ca_gdf.union_all()
+    # ca_boundary
+    return
 
 
 @app.cell
