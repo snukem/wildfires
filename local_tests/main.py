@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.14.16"
-app = marimo.App(width="medium")
+app = marimo.App()
 
 
 @app.cell
@@ -84,9 +84,96 @@ def _():
 
 @app.cell
 def _():
-    import geopolars as gpl
+    import geopandas as gpd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from shapely.geometry import Point
+
+    return Point, gpd, np
 
 
+@app.cell
+def _(gpd):
+    # Load the shapefile with GeoPolars
+    shp_path = "../data/ca_geo/CA_State.shp"
+    ca_gdf=gpd.read_file("https://www.naturalearthdata.com/downloads/110m-cultural-vectors/")
+
+    # ensure the CRS is what we expect (WGS84 for lat/lon)
+    # * CRS: Coordinate Reference System
+    # * WGS 84: World Geodetic System 1984 (EPSG:4326)
+    # ca_gdf = ca_gdf.to_crs(epsg=4326)
+    # ca_gdf.in
+    return (ca_gdf,)
+
+
+@app.cell
+def _(ca_gdf):
+    # Get the polygon representing California's boundary
+    ca_boundary = ca_gdf.union_all()
+    ca_boundary
+    return (ca_boundary,)
+
+
+@app.cell
+def _(ca_boundary):
+    # Create and filter the grid
+    # Create points for the bounding box of the entire state
+    min_lon, min_lat, max_lon, max_lat = ca_boundary.bounds
+
+    print('The min and max longitude values in CA are:')
+    print(tuple(float("{:.5f}".format(x)) for x in (min_lon, max_lon)))
+
+    print('The min and max latitude values in CA are:')
+    print(tuple(float("{:.5f}".format(x)) for x in (min_lat, max_lat)))
+    return max_lat, max_lon, min_lat, min_lon
+
+
+@app.cell
+def _():
+    # Set the grid resolution in degrees, which represents
+    # a distance that varies based on how far north of the 
+    # equator you are. At Lat:38N, there is approx 50-60mi
+    # between longitudinal degrees; at Lon:-120 latitudinal
+    # width is approx 70 mi. So 0.5 aims for ~10 mile blocks
+    resolution = 0.2
+    return (resolution,)
+
+
+@app.cell
+def _(max_lat, max_lon, min_lat, min_lon, np, resolution):
+    # Create a grid that covers the entire bounding box
+
+    # each axis separately
+    lon_points = np.arange(min_lon, max_lon, resolution)
+    lat_points = np.arange(min_lat, max_lat, resolution)
+
+    # create meshgrid, which returns a tuple of coordinate
+    # matrices from coordinate vectors; i.e. makes n-D coordinate
+    # arrays to vectorize evaluations
+    candidate_points = np.array(np.meshgrid(lon_points, lat_points)).T.reshape(-1, 2)
+
+    candidate_points
+
+    return (candidate_points,)
+
+
+@app.cell
+def _(Point, candidate_points, gpd):
+    # Create a GeoDataFrame from the candidate points
+    points_gdf = gpd.GeoDataFrame(
+        geometry=[Point(lon, lat) for lon, lat in candidate_points],
+        crs='EPSG:4326'
+    )
+
+    points_gdf
+    return (points_gdf,)
+
+
+@app.cell
+def _(ca_gdf, gpd, points_gdf):
+    # Use a spatial join to efficiently find all points that 
+    # are within the boundary
+    points_ca = gpd.sjoin(points_gdf, ca_gdf)
     return
 
 
