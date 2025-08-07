@@ -1,0 +1,18 @@
+[project]
+name = "local-tests"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "marimo[recommended]>=0.14.16",
+    "matplotlib>=3.10.5",
+    "numpy>=2.2.6",
+    "pandas>=2.3.1",
+    "polars>=1.32.2",
+    "requests>=2.32.4",
+    "scikit-learn>=1.7.1",
+    "seaborn>=0.13.2",
+    "statsmodels>=0.14.5",
+    "xgboost>=3.0.3",
+]

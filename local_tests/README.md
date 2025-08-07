@@ -1,0 +1,1 @@
+This project is mainly for exploring and testing out ideas in a local environment, that may or may not end up being useful.
