@@ -12,7 +12,7 @@ To develop an automated system that combines fixed landscape data from particula
 
 The project aims to follow an end-to-end data science lifecycle starting with ingestion of raw data sources to deployment of a useable app or dashboard:
 
-0. **Planning and Learning**: AI-assisted planning of the project, along with deep dives into setting up necessary accounts, reading documentation for required tools, finding data sources, and exploring simpler but related mini-projects for ideation.
+0. **Planning and Learning**: AI-assisted planning of the project, along with deep dives into areas I'm less familiar with and how they integrate with layers I'm more familiar with. This stage also involves setting up necessary accounts, reading documentation for required tools, finding data sources, and exploring simpler but related mini-projects for ideation.
    
 2.  **Data Ingestion:** Dynamic daily weather data is fetched from public sources. Static geospatial data (topography, land cover, historical fire perimeters) is sourced from USGS, NASA, CAL FIRE, etc.
 
