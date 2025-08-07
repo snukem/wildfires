@@ -218,7 +218,7 @@ Streamlit is an open-source Python library for building data apps with minimal c
 
 ---
 
-#### **What We'll Do: A Granular Breakdown**
+#### **A Granular Breakdown**
 
 Our app will be a single `app.py` script.
 
