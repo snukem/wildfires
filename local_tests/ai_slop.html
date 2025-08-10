@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>California 0.2° Grid Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    html,body,#app{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    #app{display:grid;grid-template-columns:320px 1fr;gap:10px;padding:10px}
+    .panel{background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:12px}
+    #map{width:100%;height:calc(100vh - 40px);border-radius:8px}
+    label{display:block;margin:8px 0 4px;font-weight:600;color:#222}
+    select,input[type=date]{width:100%;padding:8px;border-radius:6px;border:1px solid #d0d7de}
+    .row{display:flex;gap:8px}
+    .btn{display:inline-block;padding:8px 12px;border-radius:6px;border:0;background:#2563eb;color:#fff;cursor:pointer;margin-top:8px}
+    .legend{margin-top:10px;padding:8px;border-radius:6px;background:#f7fafc;font-size:13px}
+    .muted{color:#6b7280;font-size:13px}
+    .footer{font-size:12px;color:#6b7280;margin-top:10px}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="panel" style="height:calc(100vh - 20px);overflow:auto">
+      <h3 style="margin:4px 0">California Grid Dashboard</h3>
+      <div class="muted">Grid cell size: 0.2° × 0.2° (Lat × Lon)</div>
+
+      <label for="layerSelect">Data layer</label>
+      <select id="layerSelect">
+        <option value="rainfall">Average Rainfall</option>
+        <option value="fires">Number of active forest fires</option>
+        <option value="population">Average population</option>
+        <option value="temperature">Average Temperature</option>
+      </select>
+
+      <label for="startDate">Start date</label>
+      <input id="startDate" type="date" />
+
+      <label for="endDate">End date</label>
+      <input id="endDate" type="date" />
+
+      <button id="applyBtn" class="btn">Apply</button>
+      <button id="resetBtn" class="btn" style="background:#10b981;margin-left:8px">Reset view</button>
+
+      <div class="legend panel" id="legend">
+        <strong>Legend</strong>
+        <div id="legendContent" style="margin-top:8px">Choose a layer and date range, then click Apply.</div>
+      </div>
+
+      <div class="footer">Note: end date is limited to at most <strong>3 days before today</strong> to account for lagged sources.</div>
+    </div>
+
+    <div class="panel" id="mapPanel">
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // --- Configuration ---
+    const LAT_MIN = 32.5, LAT_MAX = 42.0;
+    const LON_MIN = -124.5, LON_MAX = -114.0;
+    const CELL = 0.2; // degrees
+
+    // Create map
+    const map = L.map('map', { minZoom: 5, maxZoom: 12 }).setView([37.25, -119], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+
+    // Containers
+    let gridLayer = L.layerGroup().addTo(map);
+    const cells = []; // store metadata for each cell
+
+    // build grid
+    for (let lat = LAT_MIN; lat < LAT_MAX; lat = +(lat + CELL).toFixed(6)){
+      for (let lon = LON_MIN; lon < LON_MAX; lon = +(lon + CELL).toFixed(6)){
+        const bounds = [[lat, lon], [+(lat+CELL).toFixed(6), +(lon+CELL).toFixed(6)]];
+        const rect = L.rectangle(bounds, { weight: 0.5, color: '#444', fillOpacity: 0.6 });
+        rect.addTo(gridLayer);
+        const meta = { lat: lat, lon: lon, bounds: bounds, rect: rect, values: {} };
+        rect.bindPopup('Loading...');
+        rect.on('click', (e)=>{ const m=meta; rect.openPopup(); });
+        cells.push(meta);
+      }
+    }
+
+    // Utility: clamp end date to today - 3 days
+    function isoDate(d){ return d.toISOString().slice(0,10); }
+    function getMaxEndDate(){ const t = new Date(); t.setDate(t.getDate() - 3); return t; }
+
+    // Initialize date inputs
+    const endInput = document.getElementById('endDate');
+    const startInput = document.getElementById('startDate');
+    const today = new Date();
+    const defaultEnd = new Date(); defaultEnd.setDate(defaultEnd.getDate()-3);
+    const defaultStart = new Date(); defaultStart.setDate(defaultStart.getDate()-30);
+    endInput.max = isoDate(getMaxEndDate());
+    endInput.value = isoDate(defaultEnd);
+    startInput.max = endInput.max;
+    startInput.value = isoDate(defaultStart);
+
+    // Layer settings: domains and color scales
+    const layerSpecs = {
+      rainfall: { label:'Average Rainfall (mm)', domain:[0, 200], fmt: (v)=>v.toFixed(1)+' mm' },
+      fires: { label:'Active forest fires (count)', domain:[0, 20], fmt: (v)=>Math.round(v)+' fires' },
+      population: { label:'Average population (people)', domain:[0, 20000], fmt: (v)=>Math.round(v)+' ppl' },
+      temperature: { label:'Average temperature (°C)', domain:[-5, 45], fmt: (v)=>v.toFixed(1)+' °C' }
+    };
+
+    // color scales via d3
+    function getColorScale(layer){
+      const spec = layerSpecs[layer];
+      return d3.scaleSequential().domain(spec.domain).interpolator(d3.interpolateViridis);
+    }
+
+    // synthetic data generator over the date range
+    function generateDataForRange(layer, startDate, endDate){
+      // For demo purposes we synthesize plausible spatial variation across CA.
+      // Replace this function to fetch real data per cell.
+      const days = (endDate - startDate) / (1000*3600*24) + 1;
+      const out = new Map();
+      for (const c of cells){
+        // use lat/lon to make deterministic pseudo-random variation
+        const latFactor = (c.lat - LAT_MIN) / (LAT_MAX - LAT_MIN);
+        const lonFactor = (c.lon - LON_MIN) / (LON_MAX - LON_MIN);
+
+        let value;
+        if (layer === 'rainfall'){
+          // wetter near northwest & mountains, scaled by days
+          value = (40*latFactor + 80*(1 - lonFactor)) * (1 + Math.sin((c.lat+c.lon)*3)) * (days/30);
+          value = Math.max(0, value) * (0.7 + pseudoNoise(c.lat,c.lon));
+        } else if (layer === 'fires'){
+          // more fires in dry inland areas (south-east)
+          value = 10 * (1 - latFactor) * (lonFactor) * (1 + Math.max(0, (20 - days)/20));
+          value = Math.max(0, value) * (0.5 + pseudoNoise(c.lat,c.lon));
+        } else if (layer === 'population'){
+          // population concentrated near coasts and urban clusters
+          const coastFactor = 1 - Math.abs(c.lon + 122)/5; // highest around SF -122
+          value = 5000 * Math.exp(-((c.lat-36.8)**2)/10) * Math.max(0, coastFactor) + 3000*latFactor*lonFactor;
+          value = Math.max(0, value) * (0.8 + 0.4*pseudoNoise(c.lat,c.lon));
+        } else if (layer === 'temperature'){
+          // warmer in southern and inland
+          value = 30 - 10*latFactor + 8*lonFactor + 3*(Math.sin((c.lat+c.lon)*2));
+          value = value + (Math.random()-0.5)*2; // small randomness
+        }
+        out.set(c, value);
+      }
+      return out;
+    }
+
+    function pseudoNoise(lat,lon){
+      // deterministic pseudo-noise between 0.0 and 1.0
+      const s = Math.sin((lat*97.13 + lon*61.7) * 13.37);
+      return (s + 1)/2;
+    }
+
+    // render function
+    function renderLayer(layer, startDate, endDate){
+      const spec = layerSpecs[layer];
+      const scale = getColorScale(layer);
+      const data = generateDataForRange(layer, startDate, endDate);
+
+      // update each cell's style and popup
+      for (const [c,v] of data.entries()){
+        const color = scale(Math.max(spec.domain[0], Math.min(spec.domain[1], v)));
+        c.rect.setStyle({ fillColor: color, fillOpacity: 0.7, color: '#333' });
+        c.rect.getPopup().setContent(`<strong>Cell</strong><br>lat: ${c.lat.toFixed(2)}, lon: ${c.lon.toFixed(2)}<br><strong>${spec.label}:</strong> ${spec.fmt(v)}`);
+      }
+
+      // fit to CA bounds (optional)
+      const bounds = L.latLngBounds([[LAT_MIN,LON_MIN],[LAT_MAX,LON_MAX]]);
+      //legend
+      updateLegend(layer);
+    }
+
+    function updateLegend(layer){
+      const spec = layerSpecs[layer];
+      const legend = document.getElementById('legendContent');
+      const scale = getColorScale(layer);
+      // create 6 bins
+      const bins = 6;
+      const values = d3.range(bins).map(i => spec.domain[0] + i*(spec.domain[1]-spec.domain[0])/(bins-1));
+      const swatches = values.map(v => `<div style="display:flex;align-items:center;margin:4px 0"><div style="width:28px;height:14px;margin-right:8px;background:${scale(v)};border:1px solid #ccc"></div><div style="font-size:13px">${spec.fmt(v)}</div></div>`).join('');
+      legend.innerHTML = `<div style="font-weight:600;margin-bottom:6px">${spec.label}</div>` + swatches + `<div style="margin-top:6px;color:#6b7280;font-size:12px">Cells: ${cells.length}. Date range applied at query time.</div>`;
+    }
+
+    // Button behaviors
+    document.getElementById('applyBtn').addEventListener('click', ()=>{
+      const layer = document.getElementById('layerSelect').value;
+      const s = new Date(startInput.value);
+      const e = new Date(endInput.value);
+      const maxE = getMaxEndDate();
+      if (isNaN(s) || isNaN(e)) { alert('Please select start and end dates'); return; }
+      if (e > maxE){ alert('End date cannot be later than ' + isoDate(maxE)); endInput.value = isoDate(maxE); return; }
+      if (s > e){ alert('Start date must be before or equal to end date'); return; }
+      renderLayer(layer, s, e);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', ()=>{ map.setView([37.25,-119],6); });
+
+    // initialize with default
+    renderLayer(document.getElementById('layerSelect').value, new Date(startInput.value), new Date(endInput.value));
+
+    // keep date constraints consistent
+    startInput.addEventListener('change', ()=>{
+      if (startInput.value > endInput.value) {
+        endInput.value = startInput.value;
+      }
+    });
+
+    // Accessibility: keyboard focus
+    document.getElementById('layerSelect').addEventListener('change', ()=>{ /* no-op */ });
+
+    // Resize map when container changes
+    window.addEventListener('resize', ()=>{ map.invalidateSize(); });
+  </script>
+</body>
+</html>
